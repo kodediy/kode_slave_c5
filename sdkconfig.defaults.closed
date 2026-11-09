@@ -1,0 +1,52 @@
+# The KODE Dot's C5, closed release build: the lines this design requires on
+# top of sdkconfig.defaults and sdkconfig.defaults.esp32c5. Its first boot
+# turns on secure boot and flash encryption and burns the eFuses; no open
+# build reads this file, and nothing built with it is flashed on a bench.
+#
+# App rollback with self-confirm. The C5 now holds the vault, the identity
+# and the BLE keys, and a closed C5 has no pads recovery: an update that does
+# not reach the host link (kode_svc.c confirms on the first KODE request) is
+# rolled back by the bootloader on the next reset.
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+#
+# NVS encryption in the first closed image, with the flash-encryption scheme
+# (the key lives in the encrypted nvs_key partition the table already has).
+# A plaintext NVS cannot become encrypted later, and the table cannot change
+# on a closed C5. Takes effect with the flash encryption below.
+CONFIG_NVS_ENCRYPTION=y
+CONFIG_NVS_SEC_KEY_PROTECT_USING_FLASH_ENC=y
+#
+# Secure Boot V2 with RSA-3072: IDF marks ECDSA secure boot insecure on the
+# C5 (hardware erratum, SECURE_BOOT_V2_ECDSA_INSECURE). The build does not
+# sign: the keys never sit on a build machine, so the bootloader and the app
+# are signed afterwards (espsecure sign-data with the signatures the key's
+# owner returns) and only signed files reach the line.
+CONFIG_SECURE_BOOT=y
+CONFIG_SECURE_BOOT_V2_ENABLED=y
+CONFIG_SECURE_SIGNED_APPS_RSA_SCHEME=y
+CONFIG_SECURE_BOOT_BUILD_SIGNED_BINARIES=n
+#
+# The bootloader is written with the rest: the line writes a C5 once, by
+# its test points, and the image has to be whole.
+CONFIG_SECURE_BOOT_FLASH_BOOTLOADER_DEFAULT=y
+#
+# The key slots no image signs with stay free for a key added later. The
+# options this menu unlocks are all off but this one, and the bootloader of
+# ESP-IDF 6.0.2 revokes the free slots anyway when it enables secure boot on
+# the first boot; from ESP-IDF 6.1 it leaves them.
+CONFIG_SECURE_BOOT_INSECURE=y
+CONFIG_SECURE_BOOT_ALLOW_UNUSED_DIGEST_SLOTS=y
+#
+# Flash encryption in release mode, with a key the chip makes itself on its
+# first boot: that boot encrypts the flash in place, burns the eFuses and
+# leaves the ROM in Secure Download Mode.
+CONFIG_SECURE_FLASH_ENC_ENABLED=y
+CONFIG_SECURE_FLASH_ENCRYPTION_MODE_RELEASE=y
+CONFIG_SECURE_ENABLE_SECURE_ROM_DL_MODE=y
+#
+# A signed bootloader with secure boot, flash encryption and rollback fits
+# under the table at 0x10000 only built for size. Its log stays at INFO: the
+# line's station reads the first boot's "Secure boot permanently enabled"
+# and "Flash encryption completed" to know the C5 closed.
+CONFIG_BOOTLOADER_COMPILER_OPTIMIZATION_SIZE=y
+CONFIG_BOOTLOADER_LOG_LEVEL_INFO=y

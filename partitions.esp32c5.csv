@@ -1,0 +1,14 @@
+#Name,Type,SubType,Offset,Size,Flags
+#Note: the bootloader owns 0x2000..0x10000 (56K): with Secure Boot V2 and flash
+#encryption it is 44K plus a 4K signature sector. The table sits at 0x10000
+#(CONFIG_PARTITION_TABLE_OFFSET) and the data partitions follow it with blank
+#offsets. Only the app slots are pinned: an OTA image must always land at the
+#same address, 64K aligned.
+nvs_key,data,nvs_keys,,0x1000,encrypted
+nvs,data,nvs,,0x6000,
+otadata,data,ota,,0x2000
+phy_init,data,phy,,0x1000,
+ota_0,app,ota_0,0x20000,0x1E0000,
+ota_1,app,ota_1,0x200000,0x1E0000,
+reserved,0x06,,0x3E0000,0x1A000,
+fctry,data,nvs,0x3FA000,0x6000

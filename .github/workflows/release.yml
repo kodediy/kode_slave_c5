@@ -1,0 +1,171 @@
+name: release
+
+# A v* tag publishes the C5 image built from the commit it names, with a
+# stamp "<commit> <sha256>" in the format tools/build_c5.sh in KodeOS writes.
+# kodeOS builds the C5 itself, from the commit the SDK pins, and does not
+# read this release; it is the record of what that commit produces.
+#
+# The release also carries the production line's image: the closed build,
+# signed by the factory's service with its two HSM keys, as the folder the
+# line's station (kode_program e1) downloads and writes to a virgin C5 by its
+# test points. Its first boot closes the C5 for good.
+#
+# One secret: C5_SIGN_TOKEN, the factory-link token (`ci`) the signing
+# service answers, held by the environment c5-signing. That environment
+# takes only v* tags and waits for its reviewer's approval, and only admins
+# may push a v* tag: whoever holds the token signs firmware every closed C5
+# accepts. Without it the release fails: the line takes its C5 from here,
+# and a release without the closed image would leave it nothing.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+# A second push of the same tag must not abort the first one's publish.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # First, and cheap: a tag that is not on main is refused before the gate
+  # spends its build on it.
+  on-main:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: The tag is on main
+        run: |
+          git fetch -q --no-tags origin main || exit 1
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$GITHUB_SHA is not on main; tag only what main has been through" >&2
+            exit 1
+          fi
+
+  gate:
+    needs: on-main
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    needs: gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Build the image
+        uses: espressif/esp-idf-ci-action@e6f5c74232b1ccd4c97ed641f1e48553853f1fd5 # v1.2.0
+        with:
+          esp_idf_version: v6.0.2
+          target: esp32c5
+          command: |
+            idf.py -B build_kode set-target esp32c5 build || exit 1
+            tools/check_image.sh build_kode || exit 1
+
+      - name: Stamp and gather the release files
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp build_kode/kode_c5.bin build_kode/bootloader/bootloader.bin \
+             build_kode/partition_table/partition-table.bin \
+             build_kode/ota_data_initial.bin build_kode/flasher_args.json dist/
+          sha="$(sha256sum dist/kode_c5.bin | awk '{ print $1 }')"
+          printf '%s %s\n' "$GITHUB_SHA" "$sha" > dist/c5_slave.commit
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-dist
+          path: dist/
+          if-no-files-found: error
+
+  # Built with ESP-IDF 6.1: the bootloader of 6.0.2 revokes the free key
+  # digest slots on the first boot whatever the config says.
+  closed:
+    needs: gate
+    environment: c5-signing
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Build the closed image
+        uses: espressif/esp-idf-ci-action@e6f5c74232b1ccd4c97ed641f1e48553853f1fd5 # v1.2.0
+        with:
+          esp_idf_version: v6.1
+          target: esp32c5
+          command: |
+            idf.py -B build_closed -DSDKCONFIG=build_closed/sdkconfig \
+              -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.esp32c5;sdkconfig.defaults.closed" \
+              set-target esp32c5 build || exit 1
+            tools/check_image.sh build_closed closed || exit 1
+
+      # The checks in tools/sign_closed.py hold the signatures against the
+      # two public keys in pki/ - what every closed C5 holds in eFuse - and
+      # need espsecure for that.
+      - name: Install espsecure
+        run: |
+          python3 -m venv /tmp/esptool
+          /tmp/esptool/bin/pip install --quiet esptool==5.4.0
+
+      - name: Sign the bootloader and the app
+        env:
+          SIGN_TOKEN: ${{ secrets.C5_SIGN_TOKEN }}
+        run: PATH="/tmp/esptool/bin:$PATH" python3 tools/sign_closed.py build_closed kode_c5-closed
+
+      # The folder, zipped with its files at the root as flasher_args.json
+      # names them; the signed app alone, for an update over the link; and
+      # its stamp.
+      - name: Gather the closed files
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          ( cd kode_c5-closed && zip -qr "../dist/kode_c5-closed-$TAG.zip" . )
+          cp kode_c5-closed/kode_c5.bin dist/kode_c5-closed.bin
+          sha="$(sha256sum dist/kode_c5-closed.bin | awk '{ print $1 }')"
+          printf '%s %s\n' "$GITHUB_SHA" "$sha" > dist/kode_c5-closed.commit
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-closed
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    needs: [build, closed]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+
+      - name: Sum every file
+        run: cd dist && sha256sum ./* > SHA256SUMS.txt
+
+      # A draft first, published only once every file is on it, so a failed
+      # upload never leaves a public release with half its files.
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" --repo "$REPO" --draft --verify-tag \
+             --title "kode_c5 $TAG" --generate-notes dist/*
+          gh release edit "$TAG" --repo "$REPO" --draft=false

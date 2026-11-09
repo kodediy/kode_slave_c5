@@ -1,0 +1,5 @@
+# Prueba del X2 (32.768 kHz del C5, C38/C44 = 10 pF). NO commitear sin decidir.
+# Encadenado: el BLE del C5 no tiene opcion "usa el XTAL de 32k" -- solo "usa el del
+# sistema", asi que hay que poner el RTC en el cristal y luego apuntar el BLE al RTC.
+CONFIG_RTC_CLK_SRC_EXT_CRYS=y
+CONFIG_BT_LE_LP_CLK_SRC_DEFAULT=y

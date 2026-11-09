@@ -1,0 +1,98 @@
+name: ci
+
+# The C5's firmware is built from outside this repository - kodeOS's release
+# builds the commit the SDK pins and ships it in the factory FAT - so a commit
+# here was never checked until it reached a release. This is that check, run
+# on every pull request and every push to main: the host tests of the pure
+# parts, and both configurations built and judged by tools/check_image.sh.
+# kodeOS's release refuses a C5 commit that is not on main, so main is what
+# this file guards.
+#
+# No secrets: every dependency is on the public component registry and the
+# ESP-IDF image is public.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+  workflow_dispatch:
+  # release.yml calls this as its gate, on the commit the tag names.
+  workflow_call:
+
+permissions:
+  contents: read
+
+# A newer push to a pull request makes the older run worthless; on main every
+# commit keeps its verdict.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  host-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      # The pure parts, with AddressSanitizer and UndefinedBehaviorSanitizer:
+      # they are pointer and length arithmetic over wire frames and records,
+      # which is where those catch what an assert does not.
+      - name: Run the host tests
+        env:
+          KODE_C5_CFLAGS: -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer -g
+        run: sh test/run.sh
+
+  build:
+    name: esp32c5 (${{ matrix.variant }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # kode: what kodeOS ships today. closed: the production line's image,
+        # built unsigned (sdkconfig.defaults.closed); tools/check_image.sh
+        # checks what it must hold and that its bootloader fits once signed.
+        # The closed one needs ESP-IDF 6.1: the bootloader of 6.0.2 revokes
+        # the free key digest slots on the first boot whatever the config says.
+        include:
+          - variant: kode
+            idf: v6.0.2
+          - variant: closed
+            idf: v6.1
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build and check the image
+        uses: espressif/esp-idf-ci-action@e6f5c74232b1ccd4c97ed641f1e48553853f1fd5 # v1.2.0
+        with:
+          esp_idf_version: ${{ matrix.idf }}
+          target: esp32c5
+          # Every line ends in || exit 1: the block's status is its last
+          # command's, and a bare list would report the check and drop the build.
+          command: |
+            if [ "${{ matrix.variant }}" = "closed" ]; then
+              idf.py -B build_closed -DSDKCONFIG=build_closed/sdkconfig \
+                -DSDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.esp32c5;sdkconfig.defaults.closed" \
+                set-target esp32c5 build || exit 1
+              tools/check_image.sh build_closed closed || exit 1
+            else
+              idf.py -B build_kode set-target esp32c5 build || exit 1
+              tools/check_image.sh build_kode || exit 1
+            fi
+
+      - name: Keep the image
+        uses: actions/upload-artifact@v7
+        with:
+          name: kode_c5-${{ matrix.variant }}
+          path: |
+            build_${{ matrix.variant }}/kode_c5.bin
+            build_${{ matrix.variant }}/bootloader/bootloader.bin
+            build_${{ matrix.variant }}/partition_table/partition-table.bin
+            build_${{ matrix.variant }}/ota_data_initial.bin
+            build_${{ matrix.variant }}/flasher_args.json
+          if-no-files-found: error
+          retention-days: 7

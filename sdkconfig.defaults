@@ -1,0 +1,53 @@
+# BT Configuration
+CONFIG_BT_ENABLED=y
+CONFIG_BT_CONTROLLER_ONLY=y
+
+# OTA
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_PARTITION_TABLE_TWO_OTA=y
+
+# OS
+CONFIG_FREERTOS_HZ=1000
+CONFIG_ESP_WIFI_NVS_ENABLED=y
+CONFIG_BOOTLOADER_COMPILER_OPTIMIZATION_SIZE=y
+
+#Disable enterprise support by default
+CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT=n
+
+##
+## Power Management
+##
+#CONFIG_PM_ENABLE=y
+#CONFIG_FREERTOS_USE_TICKLESS_IDLE=y
+##
+## BLE + Light Sleep: MANDATORY - Enable MAC BB power down
+#CONFIG_ESP_PHY_MAC_BB_PD=y
+## Without this: Light sleep will be disabled if BT is enabled
+##
+## Down digital peripherals in light sleep
+#CONFIG_PM_POWER_DOWN_PERIPHERAL_IN_LIGHT_SLEEP=y
+##
+#
+## host power save - wake up
+#CONFIG_ESP_HOSTED_HOST_POWER_SAVE_ENABLED=y
+#CONFIG_ESP_HOSTED_UNLOAD_BUS_DRIVER_DURING_HOST_SLEEP=y
+#CONFIG_ESP_HOSTED_LIGHT_SLEEP_ENABLE=y
+#CONFIG_ESP_HOSTED_LIGHT_SLEEP_PERIPHERAL_POWERDOWN=y
+#CONFIG_ESP_HOSTED_LIGHT_SLEEP_MIN_FREQ_MHZ=10
+
+## Examples
+#CONFIG_ESP_HOSTED_EXTRA_EXAMPLES=y
+#CONFIG_ESP_HOSTED_COPROCESSOR_EXAMPLE_LIGHT_SLEEP=y
+#
+#CONFIG_ESP_HOST_DEV_BOARD_P4_C5_CORE=y
+
+## KODE Dot — enlace P4<->C5
+## Transporte SDIO (por defecto ya en C5, explicito por claridad). El ancho
+## (1-bit / 4-bit) lo negocia el HOST P4; el slave expone D0-D3 (C5: D0=IO8,
+## D1=IO7, D2=IO14, D3=IO13, CMD=IO10, CLK=IO9) -> 4-bit disponible.
+CONFIG_ESP_SDIO_HOST_INTERFACE=y
+## GPIO expander: el P4 puede mover GPIOs del C5 por RPC (encender la microSD
+## en runtime: esp_hosted_cp_gpio_set_level(26, 0)). Compila slave_gpio_expander.c
+## y registra los 7 handlers req_gpio_* en slave_control.c. Los pines del
+## transporte SDIO quedan bloqueados; IO26/IO25/IO4 son manipulables.
+CONFIG_ESP_HOSTED_ENABLE_GPIO_EXPANDER=y
