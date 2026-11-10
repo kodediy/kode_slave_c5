@@ -28,7 +28,6 @@
 
 #define KS_TASK_STACK     4096U  /**< Bytes of the task that sends the batches.      */
 #define KS_TASK_PRIO      5U     /**< FreeRTOS priority, below the Wi-Fi task's.     */
-#define KS_CHANNEL_MAX    177U   /**< Highest channel a START may name.              */
 #define KS_FCS_LEN        4U     /**< Frame check sequence at the end of sig_len.    */
 #define KS_BATCH_ALL_LEN  (sizeof(kode_hdr_t) + sizeof(kode_sniff_batch_t) \
                            + (KODE_SNIFF_BATCH_MAX * sizeof(kode_sniff_rec_t)))
@@ -397,7 +396,7 @@ static uint8_t op_start(const uint8_t *req, uint16_t len, uint8_t *out, uint16_t
         return reply(KODE_ST_BAD_REQUEST, s_why, out, out_len);
     }
     (void)memcpy(&start, req, sizeof(start));
-    if ( KS_CHANNEL_MAX < start.channel )
+    if ( KODE_SNIFF_CHANNEL_MAX < start.channel )
     {
         return reply(KODE_ST_BAD_REQUEST, s_why, out, out_len);
     }
