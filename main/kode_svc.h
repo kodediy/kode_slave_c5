@@ -28,7 +28,7 @@ typedef uint8_t (*kode_svc_handler_t)(uint8_t op, const uint8_t *req, uint16_t l
 
 /**
  * @brief Register a service's handler. Before kode_svc_init().
- * @param service KODE_SVC_VAULT, _ID or _BTKEYS.
+ * @param service KODE_SVC_VAULT, _ID, _BTKEYS or _SNIFF.
  * @param h       The handler.
  */
 void kode_svc_register(uint8_t service, kode_svc_handler_t h);

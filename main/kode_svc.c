@@ -16,6 +16,7 @@
 
 #include "esp_hosted_peer_data.h"
 #include "kode_park.h"
+#include "kode_sniff.h"
 #include "kode_svc.h"
 #include "kode_svc_frame.h"
 #include "kode_wire.h"
@@ -187,6 +188,12 @@ static void serve(const uint8_t *msg, size_t len)
     {
         status  = kode_park_request();
         parking = (KODE_ST_OK == status);
+        if ( parking )
+        {
+            /* Before the answer, which is the last frame the host gets: a
+             * batch of frames heard would otherwise follow it. */
+            kode_sniff_stop();
+        }
     }
     else if ( (KODE_SVC_COUNT > h.service) && (NULL != s_handler[h.service]) )
     {
