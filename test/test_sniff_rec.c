@@ -109,6 +109,57 @@ int main(void)
         assert(memcmp(r.head, zero, KODE_SNIFF_HEAD_LEN) == 0);
     }
 
+    /* Address 2 is there from 16 bytes and not at 15. */
+    {
+        uint8_t const fc[2] = { 0x80U, 0x00U };
+        make_frame(f, 16U, fc[0], fc[1]);
+        poison(&r);
+        assert(ksr_build(f, 16U, -50, &r));
+        assert(memcmp(r.addr2, &f[10], 6U) == 0);
+        make_frame(f, 15U, fc[0], fc[1]);
+        poison(&r);
+        assert(ksr_build(f, 15U, -50, &r));
+        assert(memcmp(r.addr2, zero, 6U) == 0);
+    }
+
+    /* The head is full when the frame ends 8 bytes past its header, and one
+     * byte short of that it keeps seven and a zero. */
+    {
+        uint8_t const fc[2] = { 0x80U, 0x00U };
+        uint8_t const hdr = ksr_header_len(fc);
+        make_frame(f, (uint16_t)(hdr + KODE_SNIFF_HEAD_LEN), fc[0], fc[1]);
+        poison(&r);
+        assert(ksr_build(f, (uint16_t)(hdr + KODE_SNIFF_HEAD_LEN), -50, &r));
+        assert(memcmp(r.head, &f[hdr], KODE_SNIFF_HEAD_LEN) == 0);
+        make_frame(f, (uint16_t)(hdr + KODE_SNIFF_HEAD_LEN - 1U), fc[0], fc[1]);
+        poison(&r);
+        assert(ksr_build(f, (uint16_t)(hdr + KODE_SNIFF_HEAD_LEN - 1U), -50, &r));
+        assert(memcmp(r.head, &f[hdr], KODE_SNIFF_HEAD_LEN - 1U) == 0);
+        assert(0U == r.head[KODE_SNIFF_HEAD_LEN - 1U]);
+    }
+
+    /* Four addresses and QoS together: a 32-byte header, and the head after it. */
+    {
+        uint8_t const fc[2] = { 0x88U, 0x03U };
+        assert(32U == ksr_header_len(fc));
+        make_frame(f, 40U, fc[0], fc[1]);
+        assert(ksr_build(f, 40U, -50, &r));
+        assert(memcmp(r.head, &f[32], KODE_SNIFF_HEAD_LEN) == 0);
+    }
+
+    /* Only a data frame has a longer header: management and control stay at
+     * 24 with ToDS and FromDS set, or with bit 7 of byte 0 set. */
+    {
+        uint8_t const mgmt[2]  = { 0x80U, 0x03U };
+        uint8_t const mgmt2[2] = { 0xB0U, 0x03U };
+        uint8_t const ctrl[2]  = { 0xD4U, 0x03U };
+        uint8_t const ctrl2[2] = { 0xB4U, 0x00U };
+        assert(24U == ksr_header_len(mgmt));
+        assert(24U == ksr_header_len(mgmt2));
+        assert(24U == ksr_header_len(ctrl));
+        assert(24U == ksr_header_len(ctrl2));
+    }
+
     /* The type bits: the fourth value is reserved. */
     {
         uint8_t const fc[2] = { 0x0CU, 0x00U };

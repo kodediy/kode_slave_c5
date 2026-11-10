@@ -50,7 +50,10 @@ ksr_kind_t ksr_kind(const uint8_t fc[KSR_FC_LEN]);
  * @brief Bytes of the MAC header of a frame with this frame control.
  * @param fc The frame's first two bytes.
  * @return 24; 26 for QoS data; 30 or 32 for a data frame with four addresses
- *         (both ToDS and FromDS set), without or with QoS.
+ *         (both ToDS and FromDS set), without or with QoS. Management and
+ *         control frames are always 24, whatever their other bits say. An
+ *         HT-control field (4 more bytes when the order bit is set) is not
+ *         counted.
  */
 uint8_t ksr_header_len(const uint8_t fc[KSR_FC_LEN]);
 
