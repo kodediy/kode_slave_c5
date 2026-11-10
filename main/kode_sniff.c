@@ -146,6 +146,22 @@ static bool wifi_is_off(esp_err_t err)
 }
 
 /**
+ * @brief Whether the radio is in promiscuous mode now.
+ *
+ * Wi-Fi stopped or deinitialised under the service (the host stopping the
+ * station, or restarting it to make its netif) takes promiscuous mode with it
+ * and says nothing to this service: this is how it finds out.
+ *
+ * @return false when it is off, or Wi-Fi is not up to say.
+ */
+static bool promiscuous_on(void)
+{
+    bool en = false;
+
+    return (ESP_OK == esp_wifi_get_promiscuous(&en)) && en;
+}
+
+/**
  * @brief Write the answer's payload: the state as it is now.
  * @param out     The answer buffer.
  * @param out_len Out: the payload's bytes.
@@ -158,7 +174,7 @@ static void fill_state(uint8_t *out, uint16_t *out_len)
     wifi_second_chan_t second = WIFI_SECOND_CHAN_NONE;
 
     (void)memset(&s, 0, sizeof(s));
-    if ( s_on )
+    if ( s_on && promiscuous_on() )
     {
         s.on = 1U;
     }
@@ -219,7 +235,10 @@ void kode_sniff_stop(void)
  * @brief Send one period's batch if it heard a frame. Task context.
  *
  * Holds s_lock from the check of s_on to the end of the send, which is what
- * lets kode_sniff_stop() promise that nothing goes out after it returns.
+ * lets kode_sniff_stop() promise that nothing goes out after it returns. A
+ * period that finds promiscuous mode gone (Wi-Fi was stopped under it) turns
+ * the service off and sends nothing; the task then sleeps until the next
+ * START. Nothing is re-armed by itself.
  */
 static void send_period(void)
 {
@@ -232,6 +251,12 @@ static void send_period(void)
     size_t const       first = sizeof(kode_hdr_t) + sizeof(batch);
 
     (void)xSemaphoreTake(s_lock, portMAX_DELAY);
+    if ( s_on && !promiscuous_on() )
+    {
+        ESP_LOGI(TAG, "Wi-Fi stopped under the listener; the service is off");
+        s_on = false;
+        (void)xQueueReset(s_queue);
+    }
     if ( s_on )
     {
         (void)memset(&batch, 0, sizeof(batch));
