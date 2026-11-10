@@ -58,11 +58,17 @@ ksr_kind_t ksr_kind(const uint8_t fc[KSR_FC_LEN]);
 uint8_t ksr_header_len(const uint8_t fc[KSR_FC_LEN]);
 
 /**
- * @brief Fill a record from a frame: frame control, both addresses, the
- *        length on the air and the first KODE_SNIFF_HEAD_LEN bytes after the
- *        MAC header, zeros past the end of the frame.
- * @param frame The frame as the radio handed it over, without the FCS.
- * @param len   Its length on the air.
+ * @brief Fill a record from a frame: frame control, both addresses, @p len
+ *        and the first KODE_SNIFF_HEAD_LEN bytes after the MAC header, zeros
+ *        past the end of the frame.
+ *
+ * The record's len is @p len, the bytes handed in. The wire's len is the
+ * length on the air, which counts the 4-byte FCS: a caller that strips the
+ * FCS before the call, so the head never holds it, writes the length on the
+ * air into the record afterwards (kode_sniff.c does).
+ *
+ * @param frame The frame's bytes, without the FCS.
+ * @param len   The bytes at @p frame.
  * @param rssi  The signal level it was heard at, dBm.
  * @param out   Out: the record; left as it was when this returns false.
  * @return false for a frame shorter than KSR_MIN_LEN, or a NULL argument.
