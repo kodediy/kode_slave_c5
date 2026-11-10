@@ -19,3 +19,5 @@ cc -std=c11 -Wall -Wextra -Werror -UNDEBUG ${KODE_C5_CFLAGS:-} -I../main test_sv
 "$out/svc_frame"
 cc -std=c11 -Wall -Wextra -Werror -UNDEBUG ${KODE_C5_CFLAGS:-} -I../main test_btkeys_cache.c ../main/kode_btkeys_cache.c -o "$out/btkeys_cache"
 "$out/btkeys_cache"
+cc -std=c11 -Wall -Wextra -Werror -UNDEBUG ${KODE_C5_CFLAGS:-} -I../main test_sniff_rec.c ../main/kode_sniff_rec.c -o "$out/sniff_rec"
+"$out/sniff_rec"

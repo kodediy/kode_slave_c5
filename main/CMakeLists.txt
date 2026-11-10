@@ -30,6 +30,7 @@ set(COMPONENT_SRCS
 	"kode_btkeys.c"
 	"kode_btkeys_cache.c"
 	"kode_hci_filter.c"
+	"kode_sniff_rec.c"
 )
 
 if(CONFIG_ESP_HOSTED_USE_MEMPOOL)
