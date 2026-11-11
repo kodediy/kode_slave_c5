@@ -51,3 +51,7 @@ CONFIG_ESP_SDIO_HOST_INTERFACE=y
 ## y registra los 7 handlers req_gpio_* en slave_control.c. Los pines del
 ## transporte SDIO quedan bloqueados; IO26/IO25/IO4 son manipulables.
 CONFIG_ESP_HOSTED_ENABLE_GPIO_EXPANDER=y
+## The whole app descriptor in the P4's AppGetDesc RPC: date, time and the
+## ELF's SHA-256 too, so the P4 can tell which build its C5 runs (every
+## build says version 2.12.9, esp-hosted's).
+CONFIG_ESP_HOSTED_ALLOW_FULL_APP_DESC=y
