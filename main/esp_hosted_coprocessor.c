@@ -57,6 +57,7 @@
 #endif
 #include "kode_ir.h"
 #include "kode_park.h"
+#include "kode_sniff.h"
 #include "kode_svc.h"
 #include "kode_btkeys.h"
 #include "kode_id.h"
@@ -1401,11 +1402,14 @@ void app_main(void)
 		ESP_LOGE("KODE_IR", "the infrared service did not start");
 	}
 
-	/* === KODE Dot: the KODE services (vault, identity, BLE keys) - one
+	/* === KODE Dot: the KODE services (vault, identity, BLE keys, Wi-Fi frames) - one
 	 * peer-data handler; nothing opens until the host asks. */
 	kode_vault_init();
 	kode_id_init();
 	kode_btkeys_init();
+	/* The Wi-Fi frames service registers its handler and nothing else: its
+	 * queue and task wait for the host's first START. */
+	kode_sniff_init();
 	if (kode_svc_init() != ESP_OK) {
 		ESP_LOGE("KODE_SVC", "the KODE services did not start");
 	}
