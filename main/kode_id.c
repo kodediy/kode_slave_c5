@@ -18,12 +18,18 @@
 #include "mbedtls/psa_util.h"
 #include "mbedtls/x509_crt.h"
 #include "mbedtls/x509_csr.h"
+#include "soc/soc_caps.h"
 
 #include "kode_id.h"
 #include "kode_id_nonce.h"
 #include "kode_id_serial.h"
 #include "kode_svc.h"
 #include "kode_wire.h"
+
+/* ESP-IDF takes the Key Manager out after v6.1, and the key would go with it. */
+#if !SOC_KEY_MANAGER_SUPPORTED
+#error "This ESP-IDF has no Key Manager for the identity's key: build with v6.1 (kodediy/kode_slave_c5#4)"
+#endif
 
 #define TAG "kode_id"
 

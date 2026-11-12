@@ -57,6 +57,13 @@ At boot the C5 only registers the handler. The queue of 32 records and the task 
 
 ## Building
 
+Both builds, this one and the closed one, use ESP-IDF v6.1 and no other version:
+
+- The identity's key lives in the Key Manager of the C5. ESP-IDF takes the Key Manager out after v6.1 ([#4](https://github.com/kodediy/kode_slave_c5/issues/4)), and `main/kode_id.c` stops the build on a version without it.
+- The bootloader of 6.0.2 revokes the free key slots when it closes a C5 (see the closed build below).
+
+`tools/check_image.sh` refuses a build made with any other version.
+
 ```bash
 idf.py set-target esp32c5
 idf.py build

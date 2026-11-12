@@ -56,20 +56,19 @@ jobs:
         # kode: what kodeOS ships today. closed: the production line's image,
         # built unsigned (sdkconfig.defaults.closed); tools/check_image.sh
         # checks what it must hold and that its bootloader fits once signed.
-        # The closed one needs ESP-IDF 6.1: the bootloader of 6.0.2 revokes
-        # the free key digest slots on the first boot whatever the config says.
-        include:
-          - variant: kode
-            idf: v6.0.2
-          - variant: closed
-            idf: v6.1
+        variant: [kode, closed]
     steps:
       - uses: actions/checkout@v7
 
+      # Both on ESP-IDF v6.1 exactly, and tools/check_image.sh refuses any
+      # other: the identity's key lives in the Key Manager, which ESP-IDF
+      # takes out after v6.1 (kodediy/kode_slave_c5#4), and the bootloader of
+      # 6.0.2 revokes the free key digest slots on the first boot whatever the
+      # config says.
       - name: Build and check the image
         uses: espressif/esp-idf-ci-action@e6f5c74232b1ccd4c97ed641f1e48553853f1fd5 # v1.2.0
         with:
-          esp_idf_version: ${{ matrix.idf }}
+          esp_idf_version: v6.1
           target: esp32c5
           # Every line ends in || exit 1: the block's status is its last
           # command's, and a bare list would report the check and drop the build.
