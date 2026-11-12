@@ -73,6 +73,7 @@ require() {
 require "the P4 link runs over SDIO" ESP_SDIO_HOST_INTERFACE true
 require "BLE is a controller for the P4's host" BT_CONTROLLER_ONLY true
 require "the identity's CSR can be written" MBEDTLS_X509_CSR_WRITE_C true
+require "the P4 tells one build from another" ESP_HOSTED_ALLOW_FULL_APP_DESC true
 # require_off <what> <CONFIG name>: off, whether its menu shows it or not
 require_off() {
     local got
