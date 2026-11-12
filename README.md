@@ -117,7 +117,7 @@ The image descriptor tells the two builds apart. The function `esp_hosted_get_co
 - the `project_name` (`kode_c5`);
 - the `PROJECT_VER` (`2.12.9`, read from `main/esp_hosted_coprocessor_fw_ver.h`);
 - the IDF version;
-- the build date, the build time and the ELF sha256, only when the slave is built with the option `CONFIG_ESP_HOSTED_ALLOW_FULL_APP_DESC`. The defaults of this firmware do not set it, and its default is off. The ELF sha256 is a fingerprint of the build.
+- the build date, the build time and the ELF sha256. The slave sends them because `sdkconfig.defaults` sets the option `CONFIG_ESP_HOSTED_ALLOW_FULL_APP_DESC`, which is off in esp-hosted. The ELF sha256 is a fingerprint of the build. The date and the time are part of the image, so two images built from the same commit at different times have a different sha256. The sha256 names one image, not one commit.
 
 The production row for the C5 requires `project_name == "kode_c5"`. A row is one hardware check of the production test. The row logs the other values as the record of the unit.
 
