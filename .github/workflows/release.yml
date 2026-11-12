@@ -60,10 +60,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      # ESP-IDF v6.1, like the closed image; ci.yml says why.
       - name: Build the image
         uses: espressif/esp-idf-ci-action@e6f5c74232b1ccd4c97ed641f1e48553853f1fd5 # v1.2.0
         with:
-          esp_idf_version: v6.0.2
+          esp_idf_version: v6.1
           target: esp32c5
           command: |
             idf.py -B build_kode set-target esp32c5 build || exit 1
@@ -85,8 +86,6 @@ jobs:
           path: dist/
           if-no-files-found: error
 
-  # Built with ESP-IDF 6.1: the bootloader of 6.0.2 revokes the free key
-  # digest slots on the first boot whatever the config says.
   closed:
     needs: gate
     environment: c5-signing
