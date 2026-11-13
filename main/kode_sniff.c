@@ -38,6 +38,7 @@ static SemaphoreHandle_t s_lock;    /* held while a batch is sent, and by STOP  
 static TaskHandle_t      s_task;    /* sends the batches; created by the first START */
 static volatile bool     s_on;      /* promiscuous mode is on and batches may go out */
 static uint8_t           s_why;     /* KODE_SNIFF_WHY_* of the last START's refusal */
+static bool              s_wide;    /* the START that is listening asked for the wide record; under s_lock */
 
 /*
  * What the callback (Wi-Fi task) writes and the sending task reads and
@@ -242,8 +243,12 @@ void kode_sniff_stop(void)
  */
 static void send_period(void)
 {
-    uint8_t            msg[KS_BATCH_ALL_LEN];
+    /* One task sends, under s_lock: the message is kept off its stack, which
+     * a full batch of records would take a seventh of. */
+    static uint8_t     msg[KS_BATCH_ALL_LEN];
     kode_sniff_batch_t batch;
+    kode_sniff_rec_t   rec;
+    size_t             used = 0U;
     uint8_t            n = 0U;
     uint8_t            primary = 0U;
     uint8_t            net = 0U;
@@ -272,10 +277,11 @@ static void send_period(void)
         {
             /* Each period hands over its own records, the first it heard; what
              * is left in the queue is dropped, never carried into the next. */
-            while ( (KODE_SNIFF_BATCH_MAX > n)
-                    && (pdTRUE == xQueueReceive(s_queue,
-                                                &msg[first + ((size_t)n * sizeof(kode_sniff_rec_t))], 0)) )
+            while ( (KODE_SNIFF_BATCH_MAX > n) && (pdTRUE == xQueueReceive(s_queue, &rec, 0)) )
             {
+                /* At the size the START asked for: a P4 from before the
+                 * wide record reads only the short one. */
+                used += ksr_pack(&rec, s_wide, &msg[first + used]);
                 n++;
             }
             (void)xQueueReset(s_queue);
@@ -289,7 +295,7 @@ static void send_period(void)
             }
             batch.count = n;
 
-            uint16_t const pay = (uint16_t)(sizeof(batch) + ((size_t)n * sizeof(kode_sniff_rec_t)));
+            uint16_t const pay = (uint16_t)(sizeof(batch) + used);
             kode_hdr_t const h = { KODE_WIRE_VERSION, KODE_SVC_SNIFF, KODE_SNIFF_EVT_BATCH,
                                    0U, KODE_ST_OK, 0U, pay };
             (void)memcpy(msg, &h, sizeof(h));
@@ -447,6 +453,12 @@ static uint8_t op_start(const uint8_t *req, uint16_t len, uint8_t *out, uint16_t
 
     (void)xSemaphoreTake(s_lock, portMAX_DELAY);
     ok = listen_start(start.channel, (!joined) && (0U != start.channel), &why);
+    if ( ok )
+    {
+        /* Other bits are 0 from a P4 that knows the field, and a P4 from
+         * before it sent 0: the short record. */
+        s_wide = (0U != (start.flags & KODE_SNIFF_WIDE));
+    }
     (void)xSemaphoreGive(s_lock);
     if ( ok )
     {
