@@ -9,6 +9,7 @@
 #define KODE_SNIFF_REC_H_
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "kode_wire.h"
@@ -25,6 +26,7 @@
 #define KSR_ADDR_LEN        6U     /**< Bytes of one MAC address.              */
 #define KSR_ADDR1_AT        4U     /**< Address 1 starts here.                 */
 #define KSR_ADDR2_AT        10U    /**< Address 2 starts here.                 */
+#define KSR_ADDR3_AT        16U    /**< Address 3 starts here.                 */
 #define KSR_MIN_LEN         10U    /**< Shortest frame: an ACK, address 1 only. */
 #define KSR_ADDR2_MIN_LEN   16U    /**< A frame this long has an address 2.    */
 #define KSR_HDR_LEN         24U    /**< MAC header with three addresses.       */
@@ -58,9 +60,15 @@ ksr_kind_t ksr_kind(const uint8_t fc[KSR_FC_LEN]);
 uint8_t ksr_header_len(const uint8_t fc[KSR_FC_LEN]);
 
 /**
- * @brief Fill a record from a frame: frame control, both addresses, @p len
- *        and the first KODE_SNIFF_HEAD_LEN bytes after the MAC header, zeros
- *        past the end of the frame.
+ * @brief Fill a record from a frame: frame control, its addresses, @p len
+ *        and, for a management or a control frame, the first
+ *        KODE_SNIFF_HEAD_LEN bytes after the MAC header, zeros past the end
+ *        of the frame. A data frame's head is zeros: what follows its header
+ *        is a third party's traffic.
+ *
+ * Address 2 is there in a frame of KSR_ADDR2_MIN_LEN bytes or more. Address 3
+ * is a management or a data frame's, once it has its whole three-address
+ * header: a control frame has none, whatever its length.
  *
  * The record's len is @p len, the bytes handed in. The wire's len is the
  * length on the air, which counts the 4-byte FCS: a caller that strips the
@@ -74,5 +82,21 @@ uint8_t ksr_header_len(const uint8_t fc[KSR_FC_LEN]);
  * @return false for a frame shorter than KSR_MIN_LEN, or a NULL argument.
  */
 bool ksr_build(const uint8_t *frame, uint16_t len, int8_t rssi, kode_sniff_rec_t *out);
+
+/**
+ * @brief Write a record into a batch at the size the P4 asked for.
+ *
+ * With @p wide, the record whole (kode_sniff_rec_t). Without it,
+ * kode_sniff_rec_short_t, the record a P4 from before KODE_SNIFF_WIDE reads:
+ * no third address, and the first KODE_SNIFF_SHORT_HEAD_LEN bytes of head.
+ *
+ * @param rec  A record ksr_build() filled.
+ * @param wide Whether SNIFF_START asked with KODE_SNIFF_WIDE.
+ * @param out  Room for sizeof(kode_sniff_rec_t) bytes; the wire is bytes,
+ *             so it needs no alignment.
+ * @return The bytes written: sizeof(kode_sniff_rec_t) or
+ *         sizeof(kode_sniff_rec_short_t).
+ */
+size_t ksr_pack(const kode_sniff_rec_t *rec, bool wide, uint8_t *out);
 
 #endif /* KODE_SNIFF_REC_H_ */

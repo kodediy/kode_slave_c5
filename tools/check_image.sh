@@ -7,6 +7,9 @@
 #   - the project is named kode_c5, which is how kodeOS tells this firmware
 #     from a stock esp-hosted slave (`c5`'s recog=kode) - a rename would build,
 #     flash and run, and kodeOS would no longer recognise it;
+#   - it was built with ESP-IDF v6.1: a later one has no Key Manager for the
+#     identity's key (kodediy/kode_slave_c5#4), and the bootloader of 6.0.2
+#     revokes the free key digest slots when it closes a C5;
 #   - the Kconfig lines the firmware is built around are set, because an
 #     option that silently drops out of a configuration still builds.
 #
@@ -20,6 +23,8 @@ variant="${2:-kode}"
 
 # Past this share of the slot the size check warns.
 WARN_PERCENT=90
+# The one ESP-IDF both builds are made with, as the build records it.
+IDF_VERSION="v6.1"
 # The closed bootloader's room: from its offset to the partition table, less
 # the sector its Secure Boot V2 signature takes.
 BOOTLOADER_OFFSET=$((0x2000))
@@ -61,6 +66,11 @@ if [ "$name" != "kode_c5" ]; then
     error "the project is named '$name'; kodeOS recognises this firmware as kode_c5"
 fi
 
+idf="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["git_revision"])' "$desc")"
+if [ "$idf" != "$IDF_VERSION" ]; then
+    error "built with ESP-IDF $idf; the C5 is built with $IDF_VERSION"
+fi
+
 # require <CONFIG name> <expected json value>
 require() {
     local got
@@ -73,6 +83,7 @@ require() {
 require "the P4 link runs over SDIO" ESP_SDIO_HOST_INTERFACE true
 require "BLE is a controller for the P4's host" BT_CONTROLLER_ONLY true
 require "the identity's CSR can be written" MBEDTLS_X509_CSR_WRITE_C true
+require "the P4 tells one build from another" ESP_HOSTED_ALLOW_FULL_APP_DESC true
 # require_off <what> <CONFIG name>: off, whether its menu shows it or not
 require_off() {
     local got

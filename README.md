@@ -47,7 +47,7 @@ The end of `sdkconfig.defaults` adds two options to the defaults of Espressif:
 
 The C5 listens to the air when the host asks. The host sends a start request with a channel, and the C5 turns on promiscuous mode. In this mode the radio hands up every frame it hears, not only the frames for itself. The service asks for management frames and data frames, never control frames, and it only receives: it builds no frame and calls no transmit function.
 
-Every 100 ms in which it heard at least one frame, the C5 sends one event to the host. The event holds the number of management frames and of data frames heard in that period, the strongest signal level, the channel, and up to eight records of 25 bytes. A record holds the frame control, the first two addresses, the length of the frame on the air and the first eight bytes after the MAC header. The MAC header is the part of a frame that says who sent it and who it is for. A period with no frame sends nothing. The counts include every frame heard, also the ones that have no record.
+Every 100 ms in which it heard at least one frame, the C5 sends one event to the host. The event holds the number of management frames and of data frames heard in that period, the strongest signal level, the channel, and up to eight records of 71 bytes. A record holds the frame control, the first three addresses, the length of the frame on the air and the first 48 bytes after the MAC header. The MAC header is the part of a frame that says who sent it and who it is for; in a beacon, the 48 bytes after it hold the network's capabilities, with the bit that says it is protected, and its name. A data frame keeps none of the bytes after its MAC header, because they are other people's traffic: their place in the record is zeros. A control frame has no third address, and its place in the record is zeros too. These records go only to a host that asks for them with a flag in its start request. Without the flag the C5 sends records of 25 bytes, with the first two addresses and the first eight bytes after the MAC header, the record that a host from before the flag reads. A period with no frame sends nothing. The counts include every frame heard, also the ones that have no record.
 
 The service never changes the station. It does not connect, disconnect or scan. While the station holds an association, the radio stays on the channel of the network, so a request for any other channel is refused and the service keeps what it was doing. A request with channel 0 listens where the radio is. A request while Wi-Fi is not started is refused too, and so is one that the radio does not let into promiscuous mode: both answer with the reason "Wi-Fi off". The stop request turns promiscuous mode off, and so does the park request, before its answer. If Wi-Fi is stopped under the service, promiscuous mode goes with it: the next period sees that, the service turns itself off and its task sleeps, and the state answer says it is not listening. It does not start again by itself.
 
@@ -56,6 +56,13 @@ Some things are not counted. The number of frames heard counts every frame, but 
 At boot the C5 only registers the handler. The queue of 32 records and the task that sends the events are created by the first start request, and promiscuous mode is never on before one. The service is in `main/kode_sniff.c`, the record builder in `main/kode_sniff_rec.c` (its test runs on the host, `test/test_sniff_rec.c`), and the messages in `main/kode_wire.h`.
 
 ## Building
+
+Both builds, this one and the closed one, use ESP-IDF v6.1 and no other version:
+
+- The identity's key lives in the Key Manager of the C5. ESP-IDF takes the Key Manager out after v6.1 ([#4](https://github.com/kodediy/kode_slave_c5/issues/4)), and `main/kode_id.c` stops the build on a version without it.
+- The bootloader of 6.0.2 revokes the free key slots when it closes a C5 (see the closed build below).
+
+`tools/check_image.sh` refuses a build made with any other version.
 
 ```bash
 idf.py set-target esp32c5
@@ -117,7 +124,7 @@ The image descriptor tells the two builds apart. The function `esp_hosted_get_co
 - the `project_name` (`kode_c5`);
 - the `PROJECT_VER` (`2.12.9`, read from `main/esp_hosted_coprocessor_fw_ver.h`);
 - the IDF version;
-- the build date, the build time and the ELF sha256, only when the slave is built with the option `CONFIG_ESP_HOSTED_ALLOW_FULL_APP_DESC`. The defaults of this firmware do not set it, and its default is off. The ELF sha256 is a fingerprint of the build.
+- the build date, the build time and the ELF sha256. The slave sends them because `sdkconfig.defaults` sets the option `CONFIG_ESP_HOSTED_ALLOW_FULL_APP_DESC`, which is off in esp-hosted. The ELF sha256 is a fingerprint of the build. The date and the time are part of the image, so two images built from the same commit at different times have a different sha256. The sha256 names one image, not one commit.
 
 The production row for the C5 requires `project_name == "kode_c5"`. A row is one hardware check of the production test. The row logs the other values as the record of the unit.
 

@@ -51,3 +51,5 @@ CONFIG_ESP_SDIO_HOST_INTERFACE=y
 ## y registra los 7 handlers req_gpio_* en slave_control.c. Los pines del
 ## transporte SDIO quedan bloqueados; IO26/IO25/IO4 son manipulables.
 CONFIG_ESP_HOSTED_ENABLE_GPIO_EXPANDER=y
+## The P4 also reads the build's date, time and ELF SHA-256, to tell one build from another. (esp_hosted)
+CONFIG_ESP_HOSTED_ALLOW_FULL_APP_DESC=y
