@@ -28,8 +28,9 @@ variant="${2:-kode}"
 WARN_PERCENT=90
 # The one ESP-IDF both builds are made with, as the build records it.
 IDF_VERSION="v6.1"
-# A release version: three numbers, as the tags are named without their v.
-RELEASE_VERSION_RE='^[0-9]+\.[0-9]+\.[0-9]+$'
+# A version of three numbers: a release, as the tags are named without their
+# v, and esp-hosted's own.
+VERSION_RE='^[0-9]+\.[0-9]+\.[0-9]+$'
 # Where esp-hosted's own version is written, for the link.
 HOSTED_VERSION_HEADER="main/esp_hosted_coprocessor_fw_ver.h"
 # The closed bootloader's room: from its offset to the partition table, less
@@ -75,7 +76,11 @@ fi
 
 version="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["project_version"])' "$desc")"
 hosted="$(awk '/^#define[ \t]+PROJECT_VERSION_(MAJOR|MINOR|PATCH)_1[ \t]/ { printf "%s%s", sep, $3; sep = "." }' "$HOSTED_VERSION_HEADER")"
-if ! [[ "$version" =~ $RELEASE_VERSION_RE ]]; then
+# A header this cannot read would let esp-hosted's version through unseen.
+if ! [[ "$hosted" =~ $VERSION_RE ]]; then
+    error "cannot read esp-hosted's version from $HOSTED_VERSION_HEADER (read '$hosted')"
+fi
+if ! [[ "$version" =~ $VERSION_RE ]]; then
     error "the image's version is '$version'; it must be kode_c5's release, X.Y.Z"
 elif [ "$version" = "$hosted" ]; then
     error "the image's version is esp-hosted's $hosted; it must be kode_c5's release (PROJECT_VER in CMakeLists.txt)"
