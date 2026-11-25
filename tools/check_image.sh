@@ -7,6 +7,9 @@
 #   - the project is named kode_c5, which is how kodeOS tells this firmware
 #     from a stock esp-hosted slave (`c5`'s recog=kode) - a rename would build,
 #     flash and run, and kodeOS would no longer recognise it;
+#   - the image's version is kode_c5's release, X.Y.Z, which kodeOS's `info`
+#     prints as c5=; esp-hosted's own version, the one the link negotiates,
+#     stays in main/esp_hosted_coprocessor_fw_ver.h and is not the image's;
 #   - it was built with ESP-IDF v6.1: a later one has no Key Manager for the
 #     identity's key (kodediy/kode_slave_c5#4), and the bootloader of 6.0.2
 #     revokes the free key digest slots when it closes a C5;
@@ -25,6 +28,11 @@ variant="${2:-kode}"
 WARN_PERCENT=90
 # The one ESP-IDF both builds are made with, as the build records it.
 IDF_VERSION="v6.1"
+# A version of three numbers: a release, as the tags are named without their
+# v, and esp-hosted's own.
+VERSION_RE='^[0-9]+\.[0-9]+\.[0-9]+$'
+# Where esp-hosted's own version is written, for the link.
+HOSTED_VERSION_HEADER="main/esp_hosted_coprocessor_fw_ver.h"
 # The closed bootloader's room: from its offset to the partition table, less
 # the sector its Secure Boot V2 signature takes.
 BOOTLOADER_OFFSET=$((0x2000))
@@ -64,6 +72,18 @@ fi
 name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["project_name"])' "$desc")"
 if [ "$name" != "kode_c5" ]; then
     error "the project is named '$name'; kodeOS recognises this firmware as kode_c5"
+fi
+
+version="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["project_version"])' "$desc")"
+hosted="$(awk '/^#define[ \t]+PROJECT_VERSION_(MAJOR|MINOR|PATCH)_1[ \t]/ { printf "%s%s", sep, $3; sep = "." }' "$HOSTED_VERSION_HEADER")"
+# A header this cannot read would let esp-hosted's version through unseen.
+if ! [[ "$hosted" =~ $VERSION_RE ]]; then
+    error "cannot read esp-hosted's version from $HOSTED_VERSION_HEADER (read '$hosted')"
+fi
+if ! [[ "$version" =~ $VERSION_RE ]]; then
+    error "the image's version is '$version'; it must be kode_c5's release, X.Y.Z"
+elif [ "$version" = "$hosted" ]; then
+    error "the image's version is esp-hosted's $hosted; it must be kode_c5's release (PROJECT_VER in CMakeLists.txt)"
 fi
 
 idf="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["git_revision"])' "$desc")"
@@ -127,7 +147,7 @@ if [ "$variant" = "closed" ]; then
 fi
 
 if [ "$fail" -eq 0 ]; then
-    printf 'ok    %s: %s of %s bytes (%s %%), project %s\n' \
-           "$variant" "$size" "$slot" "$percent" "$name"
+    printf 'ok    %s: %s of %s bytes (%s %%), project %s %s\n' \
+           "$variant" "$size" "$slot" "$percent" "$name" "$version"
 fi
 exit "$fail"

@@ -75,6 +75,8 @@ In the KodeOS repository, the script `tools/build_c5.sh` builds the image into `
 
 The project is named `kode_c5` on purpose. The image descriptor is a block at the start of the image, and it carries the project name. kodeOS reads that descriptor over the link (the driver `kdrv_c5`, the console command `c5` and the test `test component=c5`). The project name is the one fact that tells this build from the stock esp-hosted. The stock esp-hosted is the slave of Espressif with no changes. Its version RPC answers 2.12.9, the same as this build.
 
+The image's version is the release of kode_c5, for example `0.1.3`. `CMakeLists.txt` sets it (`PROJECT_VER`), and the release pull request changes it: kodeOS builds the image from the commit the SDK pins and passes no version, so the source must carry it. On `develop`, `PROJECT_VER` names the next release; on `main`, it equals the tag of the release. A tag that names another version is refused by the release, and `tools/check_image.sh` refuses an image whose version is not three numbers or is the version of esp-hosted, and fails when it cannot read that version from the header. The version of esp-hosted, the one the link negotiates, stays in `main/esp_hosted_coprocessor_fw_ver.h`.
+
 The partition table of the C5 is `partitions.esp32c5.csv`. It has two slots for the firmware, A and B: `ota_0` and `ota_1`, each of 1.9 MB. It also has the partition `otadata`, which records which slot starts. So an update over the link from the P4 writes the slot that is not running. It does not overwrite the running image.
 
 ## The closed build
@@ -122,7 +124,7 @@ The version RPC answers the version of esp-hosted. It always sets the revision, 
 The image descriptor tells the two builds apart. The function `esp_hosted_get_coprocessor_app_desc()` returns these values:
 
 - the `project_name` (`kode_c5`);
-- the `PROJECT_VER` (`2.12.9`, read from `main/esp_hosted_coprocessor_fw_ver.h`);
+- the `PROJECT_VER`, the release of kode_c5 (`0.1.3`), which the console command `info` of kodeOS prints as `c5=`;
 - the IDF version;
 - the build date, the build time and the ELF sha256. The slave sends them because `sdkconfig.defaults` sets the option `CONFIG_ESP_HOSTED_ALLOW_FULL_APP_DESC`, which is off in esp-hosted. The ELF sha256 is a fingerprint of the build. The date and the time are part of the image, so two images built from the same commit at different times have a different sha256. The sha256 names one image, not one commit.
 
